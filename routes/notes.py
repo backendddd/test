@@ -35,27 +35,26 @@ async def create_note(
     return new_note
 
 # GET /notes
-@router.get("/")
+@router.get("/", response_model=list[schemas.NoteOut])
 async def get_notes(
-    skip: int = 0,
-    limit: int = 10,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: Redis = Depends(get_redis)
+    redis: Redis = Depends(get_redis),
 ):
-    cache_key = f"notes:{current_user.id}:{skip}:{limit}"
-    cached_data = await redis.get(cache_key)
-
-    if cached_data:
-        return json.loads(cached_data)
+    cache_key = f"notes:{current_user.id}:list"
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)
 
     result = await db.execute(
-        select(Note).where(Note.owner_id == current_user.id).offset(skip).limit(limit)
+        select(Note).where(Note.owner_id == current_user.id).limit(10)
     )
     notes = result.scalars().all()
-    serialized = [NoteOut.from_orm(note).dict() for note in notes]
+    serialized = [schemas.NoteOut.from_orm(note).model_dump() for note in notes]
 
-    await redis.set(cache_key, json.dumps(serialized), ex=300)
+    # ✅ Fix: datetime сериализациясын қолдау
+    await redis.set(cache_key, json.dumps(serialized, default=str), ex=300)
+
     return serialized
 
 # GET /notes/{note_id}
