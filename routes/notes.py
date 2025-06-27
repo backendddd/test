@@ -32,7 +32,6 @@ async def create_note(
     keys = await redis.keys(pattern)
     if keys:
         await redis.delete(*keys)
-    send_mock_email.delay(current_user.email)
     return new_note
 
 # GET /notes
