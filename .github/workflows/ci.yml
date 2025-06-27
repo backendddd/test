@@ -18,9 +18,9 @@ jobs:
           POSTGRES_PASSWORD: admin
           POSTGRES_DB: mydb
         options: >-
-          --health-cmd "pg_isready -U bigazy" 
-          --health-interval 10s 
-          --health-timeout 5s 
+          --health-cmd "pg_isready -U bigazy"
+          --health-interval 10s
+          --health-timeout 5s
           --health-retries 5
 
       redis:
@@ -42,9 +42,14 @@ jobs:
           pip install pytest
 
       - name: 🧪 Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://bigazy:admin@localhost/mydb
+          SECRET_KEY: supersecret
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/0
         run: |
           pytest
-          
+
       - name: 🐳 Build Docker image
         run: |
           docker build . -t myapp:latest
