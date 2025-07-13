@@ -9,12 +9,14 @@ from utils import get_current_user, require_role
 from sqlalchemy import select
 from fastapi.staticfiles import StaticFiles
 from config import settings
-
+from prometheus_fastapi_instrumentator import Instrumentator
 import schemas, models
-from routes import notes, tasks, ws, health
+from routes import notes, tasks, ws
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 # ✅ Logging + Prometheus
-from prometheus_fastapi_instrumentator import Instrumentator
+
 from logging_config import configure_logging
 from logging_middleware import LoggingMiddleware
 
@@ -24,6 +26,10 @@ print(settings.database_url)
 
 # ✅ FastAPI init
 app = FastAPI()
+
+@app.get("/health")
+async def healthcheck():
+    return JSONResponse(content={"status": "ok"}, status_code=200)
 
 # ✅ Logging config
 configure_logging()
@@ -40,7 +46,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(notes.router)
 app.include_router(tasks.router)
 app.include_router(ws.router)
-app.include_router(health.router)
 
 # ✅ DB Init
 @app.on_event("startup")
