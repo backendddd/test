@@ -1,4 +1,4 @@
-name: Minimal Test
+name: CI/CD Pipeline
 
 on:
   push:
@@ -6,8 +6,72 @@ on:
       - main
 
 jobs:
-  just_echo:
+  build_and_test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:latest
+        ports: ["5432:5432"]
+        env:
+          POSTGRES_USER: bigazy
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: mydb
+        options: >-
+          --health-cmd "pg_isready -U bigazy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+
     steps:
-      - name: Say hello
-        run: echo "✅ GitHub Actions is working"
+      - name: 🔄 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: 🧪 Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://bigazy:admin@localhost/mydb
+          SECRET_KEY: supersecret
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/0
+        run: |
+          pytest
+
+      - name: 🐳 Build Docker image
+        run: |
+          docker build . -t ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
+
+  deploy:
+    needs: build_and_test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔐 Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 📤 Push image to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
+
+      - name: 🚀 Deploy to Render
+        run: |
+          curl -X POST https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
