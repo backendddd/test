@@ -1,12 +1,12 @@
-import redis.asyncio as redis
-from config import settings  # .env-тен конфигурация
+# dependencies/redis.py
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
+from fastapi import Depends, HTTPException
 
-# Redis URL-ды .env арқылы жинаймыз
-REDIS_URL = f"redis://{settings.redis_host}:{settings.redis_port}"
+def get_redis() -> Redis:
+    try:
+        redis = Redis(host="localhost", port=6379, decode_responses=True)
+        return redis
+    except RedisError:
+        raise HTTPException(status_code=500, detail="Redis connection error")
 
-# Redis клиент
-redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-
-# FastAPI Depends үшін функция
-async def get_redis():
-    return redis_client
